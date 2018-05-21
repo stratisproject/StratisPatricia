@@ -61,7 +61,7 @@ namespace Stratis.Patricia
             int flags = ((this.off & 1) != 0 ? ODD_OFFSET_FLAG : 0) | (this.IsTerminal ? TERMINATOR_FLAG : 0);
             byte[] ret = new byte[this.Length / 2 + 1];
             int toCopy = (flags & ODD_OFFSET_FLAG) != 0 ? ret.Length : ret.Length - 1;
-            Array.Copy(this.key, this.key.Length - toCopy, ret, ret.Length - toCopy, toCopy); // absolutely no idea if this is right
+            Array.Copy(this.key, this.key.Length - toCopy, ret, ret.Length - toCopy, toCopy);
             ret[0] &= 0x0F;
             ret[0] |= (byte) (flags << 4);
             return ret;
