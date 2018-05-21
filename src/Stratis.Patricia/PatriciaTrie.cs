@@ -41,11 +41,13 @@ namespace Stratis.Patricia
 
         public PatriciaTrie(byte[] root, ISource<byte[],byte[]> trieKvStore, IHasher hasher)
         {
+            // Set these first because SetRootHash does check to see if root given is an empty value!
+            this.emptyDataHash = hasher.Hash(EmptyByteArray);
+            this.emptyTrieHash = hasher.Hash(EmptyElementRlp);
+
             this.TrieKvStore = trieKvStore;
             this.Hasher = hasher;
             this.SetRootHash(root);
-            this.emptyDataHash = hasher.Hash(EmptyByteArray);
-            this.emptyTrieHash = hasher.Hash(EmptyElementRlp);
         }
 
         /// <inheritdoc />
