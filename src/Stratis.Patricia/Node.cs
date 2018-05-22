@@ -68,7 +68,7 @@ namespace Stratis.Patricia
         public Node(RLPCollection parsedRlp, PatriciaTrie trie)
         {
             this.parsedRlp = parsedRlp;
-            this.rlp = RLP.EncodeElement(parsedRlp.RLPData);
+            this.rlp = parsedRlp.RLPData;
             this.trie = trie;
         }
 
