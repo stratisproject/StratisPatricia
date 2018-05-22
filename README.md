@@ -9,7 +9,7 @@ Usage
 
 Stratis.Patricia is available on [NuGet](https://www.nuget.org/packages/Stratis.Patricia/).
 
-```
+```c#
 var key1 = new byte[] {1, 2, 3};
 var value1 = new byte[] {4, 5, 6};
 var key2 = new byte[] { 7, 8, 9 };
