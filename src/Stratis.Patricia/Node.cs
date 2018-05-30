@@ -4,13 +4,14 @@ namespace Stratis.Patricia
 {
     internal sealed class Node
     {
-        private static readonly object NullNode = new object();
-
         /// <summary>
         /// The key/value store used to store nodes and data by their hashes.
         /// </summary>
         private readonly PatriciaTrie trie;
 
+        /// <summary>
+        /// 
+        /// </summary>
         private byte[] rlp;
         private object[] children;
         private RLPCollection parsedRlp;
@@ -22,7 +23,7 @@ namespace Stratis.Patricia
         {
             get
             {
-                this.Parse();
+                Parse();
                 return this.children.Length == 17 ? NodeType.BranchNode : (this.children[1] is Node ? NodeType.KeyValueNodeNode : NodeType.KeyValueNodeValue);
             }
         }
@@ -80,7 +81,7 @@ namespace Stratis.Patricia
 
         public byte[] Encode()
         {
-            return this.Encode(1, true);
+            return Encode(1, true);
         }
 
         public bool ResolveCheck()
@@ -92,7 +93,7 @@ namespace Stratis.Patricia
 
         private void Resolve()
         {
-            if (!this.ResolveCheck())
+            if (!ResolveCheck())
                 throw new PatriciaTreeResolutionException("Invalid trie state. Can't resolve value for hash.");
         }
 
@@ -112,21 +113,21 @@ namespace Stratis.Patricia
                     byte[][] encoded = new byte[17][];
                     for (int i = 0; i < 16; i++)
                     {
-                        Node child = this.BranchNodeGetChild(i);
+                        Node child = BranchNodeGetChild(i);
                         encoded[i] = child == null ? PatriciaTrie.EmptyElementRlp : child.Encode(depth + 1, false);
                     }
-                    byte[] value = this.BranchNodeGetValue();
+                    byte[] value = BranchNodeGetValue();
                     encoded[16] = RLP.EncodeElement(value);
                     ret = RLP.EncodeList(encoded);
                 }
                 else if (type == NodeType.KeyValueNodeNode)
                 {
-                    ret = RLP.EncodeList(RLP.EncodeElement(this.KvNodeGetKey().ToPacked()), this.KvNodeGetChildNode().Encode(depth + 1, false));
+                    ret = RLP.EncodeList(RLP.EncodeElement(KvNodeGetKey().ToPacked()), KvNodeGetChildNode().Encode(depth + 1, false));
                 }
                 else
                 {
-                    byte[] value = this.KvNodeGetValue();
-                    ret = RLP.EncodeList(RLP.EncodeElement(this.KvNodeGetKey().ToPacked()),
+                    byte[] value = KvNodeGetValue();
+                    ret = RLP.EncodeList(RLP.EncodeElement(KvNodeGetKey().ToPacked()),
                                     RLP.EncodeElement(value ?? PatriciaTrie.EmptyByteArray));
                 }
                 if (this.Hash != null)
@@ -151,7 +152,7 @@ namespace Stratis.Patricia
         private void Parse()
         {
             if (this.children != null) return;
-            this.Resolve();
+            Resolve();
 
             RLPCollection list = this.parsedRlp ?? RLP.Decode(this.rlp)[0] as RLPCollection;
 
@@ -180,7 +181,7 @@ namespace Stratis.Patricia
 
         public Node BranchNodeGetChild(int hex)
         {
-            this.Parse();
+            Parse();
             object n = this.children[hex];
             if (n == null && this.parsedRlp != null)
             {
@@ -193,7 +194,7 @@ namespace Stratis.Patricia
                     byte[] bytes = this.parsedRlp[hex].RLPData;
                     if (bytes == null || bytes.Length == 0)
                     {
-                        n = NullNode;
+                        n = null;
                     }
                     else
                     {
@@ -202,27 +203,27 @@ namespace Stratis.Patricia
                 }
                 this.children[hex] = n;
             }
-            return n == NullNode ? null : (Node)n;
+            return n as Node;
         }
 
         public Node BranchNodeSetChild(int hex, Node node)
         {
-            this.Parse();
-            this.children[hex] = node ?? NullNode;
+            Parse();
+            this.children[hex] = node;
             this.Dirty = true;
             return this;
         }
 
         public byte[] BranchNodeGetValue()
         {
-            this.Parse();
+            Parse();
             object n = this.children[16];
             if (n == null && this.parsedRlp != null)
             {
                 byte[] bytes = this.parsedRlp[16].RLPData;
                 if (bytes == null || bytes.Length == 0)
                 {
-                    n = NullNode;
+                    n = null;
                 }
                 else
                 {
@@ -230,81 +231,65 @@ namespace Stratis.Patricia
                 }
                 this.children[16] = n;
             }
-            return n == NullNode ? null : (byte[])n;
+            return n as byte[];
         }
 
         public Node BranchNodeSetValue(byte[] val)
         {
-            this.Parse();
-            this.children[16] = val == null ? NullNode : val;
+            Parse();
+            this.children[16] = val;
             this.Dirty = true;
             return this;
         }
 
+        /// <summary>
+        /// Get the index at which we can compact the trie.
+        /// </summary>
+        /// <returns></returns>
         public int BranchNodeCompactIdx()
         {
-            this.Parse();
+            Parse();
             int cnt = 0;
             int idx = -1;
             for (int i = 0; i < 16; i++)
             {
-                if (this.BranchNodeGetChild(i) != null)
+                if (BranchNodeGetChild(i) != null)
                 {
                     cnt++;
                     idx = i;
                     if (cnt > 1) return -1;
                 }
             }
-            return cnt > 0 ? idx : (this.BranchNodeGetValue() == null ? -1 : 16);
-        }
-
-        public bool BranchNodeCanCompact()
-        {
-            this.Parse();
-            int cnt = 0;
-            for (int i = 0; i < 16; i++)
-            {
-                cnt += this.BranchNodeGetChild(i) == null ? 0 : 1;
-                if (cnt > 1) return false;
-            }
-            return cnt == 0 || this.BranchNodeGetValue() == null;
+            return cnt > 0 ? idx : (BranchNodeGetValue() == null ? -1 : 16);
         }
 
         public Key KvNodeGetKey()
         {
-            this.Parse();
+            Parse();
             return (Key)this.children[0];
         }
 
         public Node KvNodeGetChildNode()
         {
-            this.Parse();
+            Parse();
             return (Node)this.children[1];
         }
 
         public byte[] KvNodeGetValue()
         {
-            this.Parse();
+            Parse();
             return (byte[])this.children[1];
-        }
-
-        public Node KvNodeSetValue(byte[] value)
-        {
-            this.Parse();
-            this.children[1] = value;
-            this.Dirty = true;
-            return this;
         }
 
         public object KvNodeGetValueOrNode()
         {
-            this.Parse();
+            Parse();
             return this.children[1];
         }
 
         public Node KvNodeSetValueOrNode(object valueOrNode)
         {
-            this.Parse();
+            Parse();
             this.children[1] = valueOrNode;
             this.Dirty = true;
             return this;

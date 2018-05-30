@@ -11,7 +11,6 @@ namespace Stratis.Patricia
     {
         internal static readonly byte[] EmptyByteArray = new byte[0];
         internal static readonly byte[] EmptyElementRlp = RLP.EncodeElement(EmptyByteArray);
-        private readonly byte[] emptyDataHash;
         private readonly byte[] emptyTrieHash;
 
         /// <summary>
@@ -30,7 +29,6 @@ namespace Stratis.Patricia
         /// </summary>
         private Node root;
 
-
         public PatriciaTrie() : this(null, new MemoryDictionarySource(), new Keccak256Hasher()) { }
 
         public PatriciaTrie(byte[] root) : this(root, new MemoryDictionarySource(), new Keccak256Hasher()) { }
@@ -41,8 +39,7 @@ namespace Stratis.Patricia
 
         public PatriciaTrie(byte[] root, ISource<byte[],byte[]> trieKvStore, IHasher hasher)
         {
-            // Set these first because SetRootHash does check to see if root given is an empty value!
-            this.emptyDataHash = hasher.Hash(EmptyByteArray);
+            // Set this first because SetRootHash does check to see if root given is an empty value!
             this.emptyTrieHash = hasher.Hash(EmptyElementRlp);
 
             this.TrieKvStore = trieKvStore;
@@ -135,161 +132,165 @@ namespace Stratis.Patricia
             return this.root != null && this.root.ResolveCheck();
         }
 
-        private byte[] Get(Node n, Key k)
+        private byte[] Get(Node node, Key key)
         {
-            if (n == null)
+            if (node == null)
                 return null;
 
-            NodeType type = n.NodeType;
+            NodeType type = node.NodeType;
 
             if (type == NodeType.BranchNode)
             {
-                if (k.IsEmpty)
-                    return n.BranchNodeGetValue();
+                if (key.IsEmpty)
+                    return node.BranchNodeGetValue();
 
-                Node childNode = n.BranchNodeGetChild(k.GetHex(0));
-                return this.Get(childNode, k.Shift(1));
+                Node childNode = node.BranchNodeGetChild(key.GetHex(0));
+                return this.Get(childNode, key.Shift(1));
             }
             else
             {
-                Key k1 = k.MatchAndShift(n.KvNodeGetKey());
-                if (k1 == null) return null;
+                Key k1 = key.MatchAndShift(node.KvNodeGetKey());
+                if (k1 == null)
+                    return null;
                 if (type == NodeType.KeyValueNodeValue)
                 {
-                    return k1.IsEmpty ? n.KvNodeGetValue() : null;
+                    return k1.IsEmpty ? node.KvNodeGetValue() : null;
                 }
                 else
                 {
-                    return this.Get(n.KvNodeGetChildNode(), k1);
+                    return this.Get(node.KvNodeGetChildNode(), k1);
                 }
             }
         }
 
-        private Node Insert(Node n, Key k, object NodeOrValue)
+        private Node Insert(Node node, Key key, object toInsert)
         {
-            NodeType type = n.NodeType;
+            NodeType type = node.NodeType;
             if (type == NodeType.BranchNode)
             {
-                if (k.IsEmpty) return n.BranchNodeSetValue((byte[])NodeOrValue);
-                Node childNode = n.BranchNodeGetChild(k.GetHex(0));
+                if (key.IsEmpty) return node.BranchNodeSetValue((byte[])toInsert);
+                Node childNode = node.BranchNodeGetChild(key.GetHex(0));
                 if (childNode != null)
                 {
-                    return n.BranchNodeSetChild(k.GetHex(0), this.Insert(childNode, k.Shift(1), NodeOrValue));
+                    return node.BranchNodeSetChild(key.GetHex(0), this.Insert(childNode, key.Shift(1), toInsert));
                 }
                 else
                 {
-                    Key childKey = k.Shift(1);
+                    Key childKey = key.Shift(1);
                     Node newChildNode;
                     if (!childKey.IsEmpty)
                     {
-                        newChildNode = new Node(childKey, NodeOrValue, this);
+                        newChildNode = new Node(childKey, toInsert, this);
                     }
                     else
                     {
-                        newChildNode = NodeOrValue is Node node 
-                            ? node 
-                            : new Node(childKey, NodeOrValue, this);
+                        newChildNode = toInsert is Node nodeToInsert 
+                            ? nodeToInsert 
+                            : new Node(childKey, toInsert, this);
                     }
-                    return n.BranchNodeSetChild(k.GetHex(0), newChildNode);
+                    return node.BranchNodeSetChild(key.GetHex(0), newChildNode);
                 }
             }
             else
             {
-                Key commonPrefix = k.GetCommonPrefix(n.KvNodeGetKey());
+                Key commonPrefix = key.GetCommonPrefix(node.KvNodeGetKey());
                 if (commonPrefix.IsEmpty)
                 {
                     Node newBranchNode = new Node(this);
-                    this.Insert(newBranchNode, n.KvNodeGetKey(), n.KvNodeGetValueOrNode());
-                    this.Insert(newBranchNode, k, NodeOrValue);
-                    n.Dispose();
+                    this.Insert(newBranchNode, node.KvNodeGetKey(), node.KvNodeGetValueOrNode());
+                    this.Insert(newBranchNode, key, toInsert);
+                    node.Dispose();
                     return newBranchNode;
                 }
-                else if (commonPrefix.Equals(k))
+                else if (commonPrefix.Equals(key))
                 {
-                    return n.KvNodeSetValueOrNode(NodeOrValue);
+                    return node.KvNodeSetValueOrNode(toInsert);
                 }
-                else if (commonPrefix.Equals(n.KvNodeGetKey()))
+                else if (commonPrefix.Equals(node.KvNodeGetKey()))
                 {
-                    this.Insert(n.KvNodeGetChildNode(), k.Shift(commonPrefix.Length), NodeOrValue);
-                    return n.Invalidate();
+                    this.Insert(node.KvNodeGetChildNode(), key.Shift(commonPrefix.Length), toInsert);
+                    return node.Invalidate();
                 }
                 else
                 {
                     Node newBranchNode = new Node(this);
                     Node newKvNode = new Node(commonPrefix, newBranchNode, this);
                     // TODO can be optimized
-                    this.Insert(newKvNode, n.KvNodeGetKey(), n.KvNodeGetValueOrNode());
-                    this.Insert(newKvNode, k, NodeOrValue);
-                    n.Dispose();
+                    this.Insert(newKvNode, node.KvNodeGetKey(), node.KvNodeGetValueOrNode());
+                    this.Insert(newKvNode, key, toInsert);
+                    node.Dispose();
                     return newKvNode;
                 }
             }
         }
 
-        private Node Delete(Node n, Key k)
+        private Node Delete(Node node, Key key)
         {
-            NodeType type = n.NodeType;
+            NodeType type = node.NodeType;
             Node newKvNode;
             if (type == NodeType.BranchNode)
             {
-                if (k.IsEmpty)
+                if (key.IsEmpty)
                 {
-                    n.BranchNodeSetValue(null);
+                    node.BranchNodeSetValue(null);
                 }
                 else
                 {
-                    int idx = k.GetHex(0);
-                    Node child = n.BranchNodeGetChild(idx);
-                    if (child == null) return n; // no key found
+                    int idx = key.GetHex(0);
+                    Node child = node.BranchNodeGetChild(idx);
+                    if (child == null)
+                        return node; // no key found
 
-                    Node newNode = this.Delete(child, k.Shift(1));
-                    n.BranchNodeSetChild(idx, newNode);
-                    if (newNode != null) return n; // newNode != null thus number of children didn't decrease
+                    Node newNode = this.Delete(child, key.Shift(1));
+                    node.BranchNodeSetChild(idx, newNode);
+                    if (newNode != null)
+                        return node; // number of children didn't decrease
                 }
 
                 // child Node or value was deleted and the branch Node may need to be compacted
-                int compactIdx = n.BranchNodeCompactIdx();
-                if (compactIdx < 0) return n; // no compaction is required
+                int compactIdx = node.BranchNodeCompactIdx();
+                if (compactIdx < 0)
+                    return node; // no compaction is required
 
                 // only value or a single child left - compact branch Node to kvNode
-                n.Dispose();
+                node.Dispose();
                 if (compactIdx == 16)
                 { // only value left
-                    return new Node(Key.Empty(true), n.BranchNodeGetValue(), this);
+                    return new Node(Key.Empty(), node.BranchNodeGetValue(), this);
                 }
                 else
                 { // only single child left
-                    newKvNode = new Node(Key.SingleHex(compactIdx), n.BranchNodeGetChild(compactIdx), this);
+                    newKvNode = new Node(Key.SingleHex(compactIdx), node.BranchNodeGetChild(compactIdx), this);
                 }
             }
             else
-            { // n - kvNode
-                Key k1 = k.MatchAndShift(n.KvNodeGetKey());
+            { // node - kvNode
+                Key k1 = key.MatchAndShift(node.KvNodeGetKey());
                 if (k1 == null)
                 {
                     // no key found
-                    return n;
+                    return node;
                 }
                 else if (type == NodeType.KeyValueNodeValue)
                 {
                     if (k1.IsEmpty)
                     {
                         // delete this kvNode
-                        n.Dispose();
+                        node.Dispose();
                         return null;
                     }
                     else
                     {
                         // else no key found
-                        return n;
+                        return node;
                     }
                 }
                 else
                 {
-                    Node newChild = this.Delete(n.KvNodeGetChildNode(), k1);
+                    Node newChild = this.Delete(node.KvNodeGetChildNode(), k1);
                     if (newChild == null)
                         throw new PatriciaTreeResolutionException("New node failed instantiation after deletion.");
-                    newKvNode = n.KvNodeSetValueOrNode(newChild);
+                    newKvNode = node.KvNodeSetValueOrNode(newChild);
                 }
             }
 
