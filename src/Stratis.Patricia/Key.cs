@@ -109,7 +109,7 @@ namespace Stratis.Patricia
                 // optimization to compare whole keys bytes
                 if ((this.off & 1) == 1)
                 {
-                    if (this.GetHex(0) != key.GetHex(0))
+                    if (GetHex(0) != key.GetHex(0))
                         return null;
                 }
                 int idx1 = (this.off + 1) >> 1;
@@ -125,10 +125,10 @@ namespace Stratis.Patricia
             {
                 for (int i = 0; i < keyLength; i++)
                 {
-                    if (this.GetHex(i) != key.GetHex(i)) return null;
+                    if (GetHex(i) != key.GetHex(i)) return null;
                 }
             }
-            return this.Shift(keyLength);
+            return Shift(keyLength);
         }
 
         public Key Concat(Key key)
@@ -143,7 +143,7 @@ namespace Stratis.Patricia
             Key ret = new Key(newKeyBytes, newLength & 1);
             for (int i = 0; i < length; i++)
             {
-                ret.SetHex(i, this.GetHex(i));
+                ret.SetHex(i, GetHex(i));
             }
             for (int i = 0; i < keyLength; i++)
             {
@@ -158,7 +158,7 @@ namespace Stratis.Patricia
             int keyLength = key.Length;
 
 
-            while (prefixLen < this.Length && prefixLen < keyLength && this.GetHex(prefixLen) == key.GetHex(prefixLen))
+            while (prefixLen < this.Length && prefixLen < keyLength && GetHex(prefixLen) == key.GetHex(prefixLen))
             {
                 prefixLen++;
             }
@@ -185,7 +185,7 @@ namespace Stratis.Patricia
 
             for (int i = 0; i < this.Length; i++)
             {
-                if (this.GetHex(i) != key.GetHex(i))
+                if (GetHex(i) != key.GetHex(i))
                     return false;
             }
             return this.IsTerminal == key.IsTerminal;

@@ -10,9 +10,15 @@ namespace Stratis.Patricia
         private readonly PatriciaTrie trie;
 
         /// <summary>
-        /// 
+        /// Raw RLP data.
         /// </summary>
         private byte[] rlp;
+
+        /// <summary>
+        /// Contains key in index 0.
+        /// If a branch node, also contains 16 new nodes.
+        /// If a KvNode, also contains a link to the next node if trie is compacted, or to a value.
+        /// </summary>
         private object[] children;
         private RLPCollection parsedRlp;
 
@@ -243,10 +249,9 @@ namespace Stratis.Patricia
         }
 
         /// <summary>
-        /// Get the index at which we can compact the trie.
+        /// If there is only one branch, we can compact our patricia trie. This returns the index of the one node
         /// </summary>
-        /// <returns></returns>
-        public int BranchNodeCompactIdx()
+        public int BranchNodeCompactIndex()
         {
             Parse();
             int cnt = 0;

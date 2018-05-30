@@ -44,7 +44,7 @@ namespace Stratis.Patricia
 
             this.TrieKvStore = trieKvStore;
             this.Hasher = hasher;
-            this.SetRootHash(root);
+            SetRootHash(root);
         }
 
         /// <inheritdoc />
@@ -63,17 +63,17 @@ namespace Stratis.Patricia
         /// <inheritdoc />
         public byte[] GetRootHash()
         {
-            this.Encode();
+            Encode();
             return this.root != null ? this.root.Hash : this.emptyTrieHash;
         }
 
         /// <inheritdoc />
         public byte[] Get(byte[] key)
         {
-            if (!this.HasRoot())
+            if (!HasRoot())
                 return null;
             Key k = Key.FromNormal(key);
-            return this.Get(this.root, k);
+            return Get(this.root, k);
         }
 
         /// <inheritdoc />
@@ -91,11 +91,11 @@ namespace Stratis.Patricia
             {
                 if (value == null || value.Length == 0)
                 {
-                    this.root = this.Delete(this.root, k);
+                    this.root = Delete(this.root, k);
                 }
                 else
                 {
-                    this.root = this.Insert(this.root, k, value);
+                    this.root = Insert(this.root, k, value);
                 }
             }
         }
@@ -106,7 +106,7 @@ namespace Stratis.Patricia
             Key k = Key.FromNormal(key);
             if (this.root != null)
             {
-                this.root = this.Delete(this.root, k);
+                this.root = Delete(this.root, k);
             }
         }
 
@@ -116,7 +116,7 @@ namespace Stratis.Patricia
             if (this.root != null && this.root.Dirty)
             {
                 // persist all dirty Nodes to underlying Source
-                this.Encode();
+                Encode();
                 // release all Trie Node instances for GC
                 this.root = new Node(this.root.Hash, this);
                 return true;
@@ -145,7 +145,7 @@ namespace Stratis.Patricia
                     return node.BranchNodeGetValue();
 
                 Node childNode = node.BranchNodeGetChild(key.GetHex(0));
-                return this.Get(childNode, key.Shift(1));
+                return Get(childNode, key.Shift(1));
             }
             else
             {
@@ -158,7 +158,7 @@ namespace Stratis.Patricia
                 }
                 else
                 {
-                    return this.Get(node.KvNodeGetChildNode(), k1);
+                    return Get(node.KvNodeGetChildNode(), k1);
                 }
             }
         }
@@ -172,7 +172,7 @@ namespace Stratis.Patricia
                 Node childNode = node.BranchNodeGetChild(key.GetHex(0));
                 if (childNode != null)
                 {
-                    return node.BranchNodeSetChild(key.GetHex(0), this.Insert(childNode, key.Shift(1), toInsert));
+                    return node.BranchNodeSetChild(key.GetHex(0), Insert(childNode, key.Shift(1), toInsert));
                 }
                 else
                 {
@@ -197,8 +197,8 @@ namespace Stratis.Patricia
                 if (commonPrefix.IsEmpty)
                 {
                     Node newBranchNode = new Node(this);
-                    this.Insert(newBranchNode, node.KvNodeGetKey(), node.KvNodeGetValueOrNode());
-                    this.Insert(newBranchNode, key, toInsert);
+                    Insert(newBranchNode, node.KvNodeGetKey(), node.KvNodeGetValueOrNode());
+                    Insert(newBranchNode, key, toInsert);
                     node.Dispose();
                     return newBranchNode;
                 }
@@ -208,7 +208,7 @@ namespace Stratis.Patricia
                 }
                 else if (commonPrefix.Equals(node.KvNodeGetKey()))
                 {
-                    this.Insert(node.KvNodeGetChildNode(), key.Shift(commonPrefix.Length), toInsert);
+                    Insert(node.KvNodeGetChildNode(), key.Shift(commonPrefix.Length), toInsert);
                     return node.Invalidate();
                 }
                 else
@@ -216,8 +216,8 @@ namespace Stratis.Patricia
                     Node newBranchNode = new Node(this);
                     Node newKvNode = new Node(commonPrefix, newBranchNode, this);
                     // TODO can be optimized
-                    this.Insert(newKvNode, node.KvNodeGetKey(), node.KvNodeGetValueOrNode());
-                    this.Insert(newKvNode, key, toInsert);
+                    Insert(newKvNode, node.KvNodeGetKey(), node.KvNodeGetValueOrNode());
+                    Insert(newKvNode, key, toInsert);
                     node.Dispose();
                     return newKvNode;
                 }
@@ -241,14 +241,15 @@ namespace Stratis.Patricia
                     if (child == null)
                         return node; // no key found
 
-                    Node newNode = this.Delete(child, key.Shift(1));
+                    Node newNode = Delete(child, key.Shift(1));
                     node.BranchNodeSetChild(idx, newNode);
                     if (newNode != null)
                         return node; // number of children didn't decrease
                 }
 
-                // child Node or value was deleted and the branch Node may need to be compacted
-                int compactIdx = node.BranchNodeCompactIdx();
+                // child node or value was deleted
+                // lets see if we can compact
+                int compactIdx = node.BranchNodeCompactIndex();
                 if (compactIdx < 0)
                     return node; // no compaction is required
 
@@ -287,7 +288,7 @@ namespace Stratis.Patricia
                 }
                 else
                 {
-                    Node newChild = this.Delete(node.KvNodeGetChildNode(), k1);
+                    Node newChild = Delete(node.KvNodeGetChildNode(), k1);
                     if (newChild == null)
                         throw new PatriciaTreeResolutionException("New node failed instantiation after deletion.");
                     newKvNode = node.KvNodeSetValueOrNode(newChild);
