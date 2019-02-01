@@ -87,7 +87,7 @@ namespace Stratis.Patricia
 
         public byte[] Encode()
         {
-            return Encode(1, true);
+            return Encode(true);
         }
 
         public bool ResolveCheck()
@@ -104,7 +104,7 @@ namespace Stratis.Patricia
         }
 
 
-        private byte[] Encode(int depth, bool forceHash)
+        private byte[] Encode(bool forceHash)
         {
             if (!this.Dirty)
             {
@@ -120,7 +120,7 @@ namespace Stratis.Patricia
                     for (int i = 0; i < 16; i++)
                     {
                         Node child = BranchNodeGetChild(i);
-                        encoded[i] = child == null ? PatriciaTrie.EmptyElementRlp : child.Encode(depth + 1, false);
+                        encoded[i] = child == null ? PatriciaTrie.EmptyElementRlp : child.Encode(false);
                     }
                     byte[] value = BranchNodeGetValue();
                     encoded[16] = RLP.EncodeElement(value);
@@ -128,7 +128,7 @@ namespace Stratis.Patricia
                 }
                 else if (type == NodeType.KeyValueNodeNode)
                 {
-                    ret = RLP.EncodeList(RLP.EncodeElement(KvNodeGetKey().ToPacked()), KvNodeGetChildNode().Encode(depth + 1, false));
+                    ret = RLP.EncodeList(RLP.EncodeElement(KvNodeGetKey().ToPacked()), KvNodeGetChildNode().Encode(false));
                 }
                 else
                 {
